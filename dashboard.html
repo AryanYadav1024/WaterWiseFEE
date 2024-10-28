@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Water Irrigation Dashboard</title>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- Bootstrap CSS for Navbar and general styling -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js"></script>
+    <style>
+        /* Reset some basic styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Poppins', sans-serif;
+        }
+
+        body {
+            background-color: #ccc;
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        /* Navbar Styling */
+        .navbar {
+            height: 80px;
+            background-color: rgba(155, 211, 231, 0.23) !important;
+
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        #logo1 {
+            height: 60px;
+            width: 60px;
+            background-image: url('logo.png');
+            background-size: cover;
+            background-repeat: no-repeat;
+        }
+
+        .nav-link {
+            color: rgb(14, 12, 72) !important;
+            font-weight: 500;
+            font-size: 18px !important;
+            margin-right: 30px;
+            transition: color 0.3s;
+        }
+
+        .nav-link:hover,
+        .nav-link.active {
+            color: rgb(255, 255, 255) !important;
+        }
+
+        .btn-outline-success {
+            height: 35px;
+            font-size: 13px !important;
+            border: 1px solid rgb(95, 147, 216) !important;
+            color: rgb(255, 255, 255) !important;
+            background-color: rgba(36, 108, 56, 0.918);
+            padding-right: 10px;
+            font-weight: 800;
+            transition: background-color 0.3s, border 0.3s;
+        }
+
+        .btn-outline-success:hover {
+            background-color: rgba(24, 11, 92, 0.856) !important;
+            border: 2px solid rgb(95, 147, 216) !important;
+        }
+
+        /* Main Content Styling */
+        main {
+            flex: 1;
+            padding: 20px;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        /* Card Styles */
+        .card {
+            background-color: #fff;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+        }
+
+        .card h2 {
+            display: flex;
+            align-items: center;
+            font-size: 1.5em;
+            margin-bottom: 15px;
+            color: #2c3e50;
+        }
+
+        .card h2 svg {
+            width: 24px;
+            height: 24px;
+            margin-right: 10px;
+        }
+
+        /* Remove sideline from divs */
+        /* No border-left applied */
+
+        /* Specific Card Styles */
+        .card.temperature {
+            background-color: #ffebee; /* Light Red */
+        }
+
+        .card.humidity {
+            background-color: #e3f2fd; /* Light Blue */
+        }
+
+        .card.soil-moisture {
+            background-color: #e8f5e9; /* Light Green */
+        }
+
+        .card.water-tank {
+            background-color: #fffde7; /* Light Yellow */
+        }
+
+        .card.irrigation-status {
+            background-color: #f3e5f5; /* Light Purple */
+        }
+
+        .card.alerts {
+            background-color: #fce4ec; /* Light Pink */
+        }
+
+        .card.past-data {
+            background-color: #e0f7fa; /* Light Cyan */
+        }
+
+        .status-toggle {
+            display: flex;
+            align-items: center;
+            margin-top: 10px;
+        }
+
+        .status-toggle label {
+            margin-left: 10px;
+            font-weight: bold;
+        }
+
+        /* Toggle Switch */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 25px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            background-color: #ccc;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            transition: .4s;
+            border-radius: 25px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 19px;
+            width: 19px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #27ae60;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(24px);
+        }
+
+        /* Set chart container height */
+        .card canvas {
+            width: 100%;
+            max-height: 200px;
+        }
+
+        /* Footer Styling */
+        footer {
+            background-color: #2c3e50;
+            color: #fff;
+            text-align: center;
+            padding: 15px;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 600px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header with Navbar -->
+    <header>
+        <nav class="navbar navbar-expand-lg">
+            <div class="container-fluid">
+                <div id="logo1"></div>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent"    aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse" id="navbarSupportedContent">
+                    <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                        <li class="nav-item"><a class="nav-link" href="dashboard.html">Dashboard</a></li>
+                        <li class="nav-item"><a class="nav-link" href="soil.html">Soil Data</a></li>
+                        <li class="nav-item"><a class="nav-link" href="news.html">News</a></li>
+                        <li class="nav-item"><a class="nav-link" href="contact.html">Contact Us</a></li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <!-- Main Content -->
+    <main>
+        <div class="dashboard-grid">
+            <!-- Plant/Field Details -->
+            <div class="card plant-details">
+                <h2>
+                    <!-- SVG Icon for Plant Details -->
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2a7 7 0 017 7v3.28a2 2 0 01-.536 1.415l-2.464 2.464a1 1 0 00-.293.707v4.121a1 1 0 01-.293.707l-1 1A1 1 0 0113 23h-2a1 1 0 01-.707-.293l-1-1a1 1 0 01-.293-.707v-4.121a1 1 0 00-.293-.707l-2.464-2.464A2 2 0 015 12.28V9a7 7 0 017-7z" />
+                    </svg>
+                    Plant/Field Details
+                </h2>
+                <p><strong>Name:</strong> <span id="plant-name">--</span></p>
+                <p><strong>Type:</strong> <span id="plant-type">--</span></p>
+                <p><strong>Location:</strong> <span id="plant-location">--</span></p>
+                <p><strong>Area:</strong> <span id="plant-area">--</span> sq.m</p>
+                <p><strong>Crop:</strong> <span id="plant-crop">--</span></p>
+                <p><strong>Soil Type:</strong> <span id="soil-type">--</span></p>
+                <p><strong>Last Irrigation:</strong> <span id="last-irrigation">--</span></p>
+            </div>
+
+            <!-- Soil Moisture -->
+            <div class="card soil-moisture">
+                <h2>
+                    <!-- SVG Icon for Soil Moisture -->
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path d="M12 2C7.58 2 4 5.82 4 10c0 5.25 8 12 8 12s8-6.75 8-12c0-4.18-3.58-8-8-8z" />
+                    </svg>
+                    Soil Moisture
+                </h2>
+                <p id="soil-moisture">--%</p>
+                <canvas id="soilMoistureChart"></canvas>
+            </div>
+
+            <!-- Temperature -->
+            <div class="card temperature">
+                <h2>
+                    <!-- SVG Icon for Temperature -->
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path d="M12 2a5 5 0 00-5 5v6.59A4.5 4.5 0 1015.5 19a4.5 4.5 0 00-1.5-3.41V7a5 5 0 00-5-5z" />
+                    </svg>
+                    Temperature
+                </h2>
+                <p>Current: <span id="temperature">--°C</span></p>
+                <canvas id="temperatureChart"></canvas>
+            </div>
+
+            <!-- Humidity -->
+            <div class="card humidity">
+                <h2>
+                    <!-- SVG Icon for Humidity -->
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path d="M12 2.69l-.94.94A7.002 7.002 0 005 10c0 3.87 3.13 7 7 7s7-3.13 7-7a7.002 7.002 0 00-6.06-6.37L12 2.69z" />
+                    </svg>
+                    Humidity
+                </h2>
+                <p>Current: <span id="humidity">--%</span></p>
+                <canvas id="humidityChart"></canvas>
+            </div>
+
+            <!-- Water Tank Level -->
+            <div class="card water-tank">
+                <h2>
+                    <!-- SVG Icon for Water Tank -->
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path d="M4 3v18h16V3H4zm14 16H6V5h12v14z" />
+                    </svg>
+                    Water Tank Level
+                </h2>
+                <p id="water-tank-level">--%</p>
+                <canvas id="waterTankChart"></canvas>
+            </div>
+
+            <!-- Irrigation Status -->
+            <div class="card irrigation-status">
+                <h2>
+                    <!-- SVG Icon for Irrigation -->
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path d="M19 9h-4V3H9v6H5l7 7 7-7z" />
+                    </svg>
+                    Irrigation Status
+                </h2>
+                <div class="status-toggle">
+                    <label class="switch">
+                        <input type="checkbox" id="toggle-irrigation">
+                        <span class="slider"></span>
+                    </label>
+                    <label id="irrigation-status-label">Inactive</label>
+                </div>
+            </div>
+
+            <!-- Alerts & Notifications -->
+            <div class="card alerts">
+                <h2>
+                    <!-- SVG Icon for Alerts -->
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path d="M13 16h-1v-4h-1m1-4h.01M12 19a7 7 0 110-14 7 7 0 010 14z" />
+                    </svg>
+                    Alerts & Notifications
+                </h2>
+                <ul id="alerts">
+                    <li>No alerts</li>
+                </ul>
+            </div>
+
+            <!-- Past Data -->
+            <div class="card past-data">
+                <h2>
+                    <!-- SVG Icon for Past Data -->
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path d="M11 2a9 9 0 110 18 9 9 0 010-18zm0 2v7h7" />
+                    </svg>
+                    Past Data
+                </h2>
+                <canvas id="pastDataChart"></canvas>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer>
+        <p>&copy; 2024 Water Irrigation Project</p>
+    </footer>
+
+    <!-- Firebase and Chart.js Integration -->
+    <!-- Bootstrap JS for Navbar -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        // Your Firebase configuration
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_AUTH_DOMAIN",
+            databaseURL: "YOUR_DATABASE_URL",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        // Variables for Charts
+        let soilMoistureChart, temperatureChart, humidityChart, waterTankChart, pastDataChart;
+
+        // Initialize Charts
+        function initCharts() {
+            // Soil Moisture Line Chart
+            const soilCtx = document.getElementById('soilMoistureChart').getContext('2d');
+            soilMoistureChart = new Chart(soilCtx, {
+                type: 'line',
+                data: {
+                    labels: [], // Time labels
+                    datasets: [{
+                        label: 'Soil Moisture (%)',
+                        data: [],
+                        borderColor: '#27ae60',
+                        backgroundColor: 'rgba(39, 174, 96, 0.2)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: {
+                        duration: 1000,
+                        easing: 'easeOutQuart'
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: {
+                                callback: function(value) {
+                                    return value + "%";
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+
+            // Temperature Line Chart
+            const tempCtx = document.getElementById('temperatureChart').getContext('2d');
+            temperatureChart = new Chart(tempCtx, {
+                type: 'line',
+                data: {
+                    labels: [], // Time labels
+                    datasets: [{
+                        label: 'Temperature (°C)',
+                        data: [],
+                        borderColor: '#e74c3c',
+                        backgroundColor: 'rgba(231, 76, 60, 0.2)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: {
+                        duration: 1000,
+                        easing: 'easeOutQuart'
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            suggestedMin: 0,
+                            suggestedMax: 50,
+                            ticks: {
+                                callback: function(value) {
+                                    return value + "°C";
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+
+            // Humidity Line Chart
+            const humCtx = document.getElementById('humidityChart').getContext('2d');
+            humidityChart = new Chart(humCtx, {
+                type: 'line',
+                data: {
+                    labels: [], // Time labels
+                    datasets: [{
+                        label: 'Humidity (%)',
+                        data: [],
+                        borderColor: '#3498db',
+                        backgroundColor: 'rgba(52, 152, 219, 0.2)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: {
+                        duration: 1000,
+                        easing: 'easeOutQuart'
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: {
+                                callback: function(value) {
+                                    return value + "%";
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+
+            // Water Tank Level Donut Chart
+            const waterCtx = document.getElementById('waterTankChart').getContext('2d');
+            waterTankChart = new Chart(waterCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Used', 'Available'],
+                    datasets: [{
+                        data: [0, 0],
+                        backgroundColor: [
+                            'rgba(231, 76, 60, 0.6)',
+                            'rgba(46, 204, 113, 0.6)'
+                        ],
+                        borderWidth: 1,
+                        borderColor: '#fff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: {
+                        duration: 1000,
+                        easing: 'easeOutQuart'
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                font: {
+                                    size: 14
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Past Data Chart (Example: Soil Moisture over time)
+            const pastCtx = document.getElementById('pastDataChart').getContext('2d');
+            pastDataChart = new Chart(pastCtx, {
+                type: 'line',
+                data: {
+                    labels: [], // Dates
+                    datasets: [{
+                        label: 'Soil Moisture (%)',
+                        data: [],
+                        borderColor: '#9b59b6',
+                        backgroundColor: 'rgba(155, 89, 182, 0.2)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: {
+                        duration: 1000,
+                        easing: 'easeOutQuart'
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: {
+                                callback: function(value) {
+                                    return value + "%";
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+        }
+
+        // Update Dashboard with Data
+        function updateDashboard(data) {
+            const now = new Date();
+            const timeLabel = `${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
+
+            // Update Soil Moisture
+            document.getElementById('soil-moisture').innerText = `${data.soilMoisture}%`;
+            // Update Soil Moisture Chart
+            if (soilMoistureChart.data.labels.length >= 10) {
+                soilMoistureChart.data.labels.shift();
+                soilMoistureChart.data.datasets[0].data.shift();
+            }
+            soilMoistureChart.data.labels.push(timeLabel);
+            soilMoistureChart.data.datasets[0].data.push(data.soilMoisture);
+            soilMoistureChart.update();
+
+            // Update Temperature
+            document.getElementById('temperature').innerText = `${data.temperature}°C`;
+            // Update Temperature Chart
+            if (temperatureChart.data.labels.length >= 10) {
+                temperatureChart.data.labels.shift();
+                temperatureChart.data.datasets[0].data.shift();
+            }
+            temperatureChart.data.labels.push(timeLabel);
+            temperatureChart.data.datasets[0].data.push(data.temperature);
+            temperatureChart.update();
+
+            // Update Humidity
+            document.getElementById('humidity').innerText = `${data.humidity}%`;
+            // Update Humidity Chart
+            if (humidityChart.data.labels.length >= 10) {
+                humidityChart.data.labels.shift();
+                humidityChart.data.datasets[0].data.shift();
+            }
+            humidityChart.data.labels.push(timeLabel);
+            humidityChart.data.datasets[0].data.push(data.humidity);
+            humidityChart.update();
+
+            // Update Water Tank Level
+            document.getElementById('water-tank-level').innerText = `${data.waterTankLevel}%`;
+            waterTankChart.data.datasets[0].data = [100 - data.waterTankLevel, data.waterTankLevel];
+            waterTankChart.update();
+
+            // Update Irrigation Status
+            const irrigationToggle = document.getElementById('toggle-irrigation');
+            const statusLabel = document.getElementById('irrigation-status-label');
+            irrigationToggle.checked = data.irrigationStatus;
+            statusLabel.innerText = data.irrigationStatus ? 'Active' : 'Inactive';
+
+            // Update Alerts
+            const alertsList = document.getElementById('alerts');
+            alertsList.innerHTML = "";
+            if (data.alerts && data.alerts.length > 0) {
+                data.alerts.forEach(alert => {
+                    const li = document.createElement('li');
+                    li.innerText = alert;
+                    alertsList.appendChild(li);
+                });
+            } else {
+                alertsList.innerHTML = "<li>No alerts</li>";
+            }
+
+            // Update Plant/Field Details
+            if (data.plantDetails) {
+                document.getElementById('plant-name').innerText = data.plantDetails.name || "--";
+                document.getElementById('plant-type').innerText = data.plantDetails.type || "--";
+                document.getElementById('plant-location').innerText = data.plantDetails.location || "--";
+                document.getElementById('plant-area').innerText = data.plantDetails.area || "--";
+                document.getElementById('plant-crop').innerText = data.plantDetails.crop || "--";
+                document.getElementById('soil-type').innerText = data.plantDetails.soilType || "--";
+                document.getElementById('last-irrigation').innerText = data.plantDetails.lastIrrigation || "--";
+            }
+
+            // Update Past Data Chart (Example data)
+            if (data.pastData) {
+                pastDataChart.data.labels = data.pastData.dates || [];
+                pastDataChart.data.datasets[0].data = data.pastData.soilMoisture || [];
+                pastDataChart.update();
+            }
+        }
+
+        // Toggle Irrigation Status
+        document.getElementById('toggle-irrigation').addEventListener('change', (event) => {
+            const newStatus = event.target.checked;
+            database.ref('irrigationStatus').set(newStatus).catch(error => {
+                console.error("Error updating irrigation status:", error);
+            });
+        });
+
+        // Listen for Data Changes from Firebase
+        function listenForData() {
+            database.ref().on('value', snapshot => {
+                const data = snapshot.val();
+                if (data) {
+                    updateDashboard(data);
+                }
+            }, error => {
+                console.error("Error fetching data:", error);
+            });
+        }
+
+        // Initialize Dashboard
+        window.onload = () => {
+            initCharts();
+            listenForData();
+        };
+    </script>
+</body>
+</html>
